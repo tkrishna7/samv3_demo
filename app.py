@@ -19,7 +19,7 @@ import cv2
 import numpy as np
 import streamlit as st
 import torch
-from PIL import Image
+from PIL import Image, ImageEnhance
 from streamlit_image_coordinates import streamlit_image_coordinates
 
 # ── paths ─────────────────────────────────────────────────────────────────────
@@ -79,6 +79,20 @@ def apply_highlight_fg(
     fg = mask == 1
     result[fg] = result[fg] * (1 - alpha) + c * alpha
     return np.clip(result, 0, 255).astype(np.uint8)
+
+
+def apply_color_correction(
+    image_np: np.ndarray,
+    brightness: float,
+    contrast: float,
+    saturation: float,
+) -> np.ndarray:
+    """Apply brightness, contrast, and saturation adjustments."""
+    pil = Image.fromarray(image_np)
+    pil = ImageEnhance.Brightness(pil).enhance(brightness)
+    pil = ImageEnhance.Contrast(pil).enhance(contrast)
+    pil = ImageEnhance.Color(pil).enhance(saturation)
+    return np.array(pil)
 
 
 def hex_to_rgb(hex_color: str) -> tuple:
@@ -205,6 +219,14 @@ with st.sidebar:
         fill_color_hex = st.color_picker("Fill colour", "#1A1A2E", key="fill_color")
 
     st.divider()
+
+    # -- Color correction
+    st.subheader("Color Correction")
+    cc_brightness = st.slider("Brightness", 0.0, 2.0, 1.0, 0.05, key="cc_brightness")
+    cc_contrast = st.slider("Contrast", 0.0, 2.0, 1.0, 0.05, key="cc_contrast")
+    cc_saturation = st.slider("Saturation", 0.0, 2.0, 1.0, 0.05, key="cc_saturation")
+
+    st.divider()
     if st.button("Clear selection", use_container_width=True):
         for k in ["click_x", "click_y", "mask", "result_image"]:
             st.session_state.pop(k, None)
@@ -301,6 +323,10 @@ with col_right:
             result = apply_highlight_fg(
                 result, mask, hex_to_rgb(highlight_color_hex), highlight_alpha
             )
+
+        # Apply color correction
+        if cc_brightness != 1.0 or cc_contrast != 1.0 or cc_saturation != 1.0:
+            result = apply_color_correction(result, cc_brightness, cc_contrast, cc_saturation)
 
         result_pil = Image.fromarray(result)
         st.image(result_pil, use_container_width=True)
